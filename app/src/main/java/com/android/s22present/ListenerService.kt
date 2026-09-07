@@ -45,10 +45,6 @@ class ListenerService : Service()
 }
 
 class NotificationService : NotificationListenerService() {
-    var currentnotifs : String? = null
-    var musicactive = false
-    var musicnotiftitle: String = ""
-    var musicnotiftext: String = ""
 
     override fun onCreate() {
         Log.i("S22PresNotifServInit", "Listening...")
@@ -58,9 +54,6 @@ class NotificationService : NotificationListenerService() {
     // Gmail and Chat use styled text; getString() returns null for it.
     private fun titleOf(sbn: StatusBarNotification?): String =
         sbn?.notification?.extras?.getCharSequence("android.title")?.toString() ?: ""
-
-    private fun textOf(sbn: StatusBarNotification?): String =
-        sbn?.notification?.extras?.getCharSequence("android.text")?.toString() ?: ""
 
     // Detect players by their media session, not by a list of package names.
     private fun isMusic(sbn: StatusBarNotification?): Boolean {
@@ -76,8 +69,14 @@ class NotificationService : NotificationListenerService() {
             pkg == "com.sec.android.app.music" || pkg == "com.apple.android.music"
     }
 
+    // Setting .text stops the marquee, so kick it off again each time.
+    private fun setTitle(value: String) {
+        Globals.titlefield.text = value
+        Globals.titlefield.isSelected = true
+    }
+
     private fun clearDisplay() {
-        Globals.titlefield.text = ""
+        setTitle("")
         Globals.contentfield.text = ""
         if (Globals.style != "3") {
             if (Globals.style != "4") {
@@ -92,42 +91,33 @@ class NotificationService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        // Media notifications are ignored entirely.
+        if (isMusic(sbn)) return
+
         val title = titleOf(sbn)
-        val text = textOf(sbn)
-        val music = isMusic(sbn)
-        Log.v("S22PresNotifServ", "Posted from ${sbn.packageName}, music=$music")
-        if (title.isNotEmpty() || text.isNotEmpty()) {
-            if (Globals.titlefield.text == "" && Globals.style != "3") {
-                if (Globals.style != "4") {
-                    ObjectAnimator.ofFloat(Globals.datefield, "translationY", -20f).apply { duration = 500; start() }
-                    ObjectAnimator.ofFloat(Globals.timefield, "translationY", -20f).apply { duration = 500; start() }
-                } else {
-                    ObjectAnimator.ofFloat(Globals.datefield, "translationY", -18f).apply { duration = 500; start() }
-                    ObjectAnimator.ofFloat(Globals.timefield, "translationY", -30f).apply { duration = 500; start() }
-                }
-                ObjectAnimator.ofFloat(Globals.titlefield, "translationY", 0f).apply { duration = 500; start() }
-                ObjectAnimator.ofFloat(Globals.contentfield, "translationY", 0f).apply { duration = 500; start() }
+        if (title.isEmpty()) return
+
+        if (Globals.titlefield.text == "" && Globals.style != "3") {
+            if (Globals.style != "4") {
+                ObjectAnimator.ofFloat(Globals.datefield, "translationY", -20f).apply { duration = 500; start() }
+                ObjectAnimator.ofFloat(Globals.timefield, "translationY", -20f).apply { duration = 500; start() }
+            } else {
+                ObjectAnimator.ofFloat(Globals.datefield, "translationY", -18f).apply { duration = 500; start() }
+                ObjectAnimator.ofFloat(Globals.timefield, "translationY", -30f).apply { duration = 500; start() }
             }
-            if (music) {
-                musicactive = true
-                musicnotiftitle = title
-                musicnotiftext = text
+            ObjectAnimator.ofFloat(Globals.titlefield, "translationY", 0f).apply { duration = 500; start() }
+            ObjectAnimator.ofFloat(Globals.contentfield, "translationY", 0f).apply { duration = 500; start() }
+        }
+        if (title != Globals.titlefield.text) {
+            setTitle(title)
+            Intent().also { broadcast ->
+                broadcast.setAction("com.android.s22present.NOTIFICATION_RECEIVED")
+                sendBroadcast(broadcast)
             }
-            if (title != Globals.titlefield.text) {
-                Globals.titlefield.text = title
-                Intent().also { broadcast ->
-                    broadcast.setAction("com.android.s22present.NOTIFICATION_RECEIVED")
-                    sendBroadcast(broadcast)
-                }
-            }
-            // Music keeps its second line. Everything else shows the sender only.
-            if (music) {
-                if (text != Globals.contentfield.text) {
-                    Globals.contentfield.text = text
-                }
-            } else if (Globals.contentfield.text != "") {
-                Globals.contentfield.text = ""
-            }
+        }
+        // Sender only - never the message body.
+        if (Globals.contentfield.text != "") {
+            Globals.contentfield.text = ""
         }
     }
 
@@ -141,9 +131,6 @@ class NotificationService : NotificationListenerService() {
             null
         }
 
-        // Media notifications are usually ongoing, so look for them separately.
-        val musicStill = active?.firstOrNull { isMusic(it) && titleOf(it).isNotEmpty() }
-
         val remaining = active?.filter {
             it.isClearable &&
             !isMusic(it) &&
@@ -153,24 +140,11 @@ class NotificationService : NotificationListenerService() {
 
         when {
             active == null -> { }
-            musicStill != null -> {
-                Log.v("S22PresNotifServ", "Restoring music")
-                musicactive = true
-                musicnotiftitle = titleOf(musicStill)
-                musicnotiftext = textOf(musicStill)
-                Globals.titlefield.text = musicnotiftitle
-                Globals.contentfield.text = musicnotiftext
-            }
-            remaining.isNullOrEmpty() -> {
-                musicactive = false
-                musicnotiftitle = ""
-                musicnotiftext = ""
-                clearDisplay()
-            }
+            remaining.isNullOrEmpty() -> clearDisplay()
             else -> {
                 if (Globals.titlefield.text.isNotEmpty()) {
                     val newest = remaining.maxByOrNull { it.postTime }
-                    Globals.titlefield.text = titleOf(newest)
+                    setTitle(titleOf(newest))
                     Globals.contentfield.text = ""
                 }
             }
