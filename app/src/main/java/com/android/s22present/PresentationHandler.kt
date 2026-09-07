@@ -2,7 +2,12 @@ package com.android.s22present
 
 import android.animation.ObjectAnimator
 import android.app.Presentation
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+
 import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
@@ -188,7 +193,31 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
         {
             pixelfontset()
         }
+                // Append the battery percentage to the date, and keep it current.
+        val baseDate = Globals.datefield.text.toString()
+        batteryReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+                if (level >= 0 && scale > 0) {
+                    Globals.datefield.text = "$baseDate  ${level * 100 / scale}%"
+                }
+            }
+        }
+        context.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+
         Log.i("S22PresHandlerInit", "Presentation displayed")
     }
+
+    private var batteryReceiver: BroadcastReceiver? = null
+
+    override fun onStop() {
+        batteryReceiver?.let {
+            try { context.unregisterReceiver(it) } catch (e: IllegalArgumentException) { }
+        }
+        batteryReceiver = null
+        super.onStop()
+    }
 }
+
 
