@@ -93,21 +93,18 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
             findViewById<TextView>(R.id.textViewTitle).typeface=submarinerfont
             findViewById<TextView>(R.id.textViewContent).typeface=submarinerfont
         }
+        // Visualiser disabled - no audio capture, no repainting.
         fun squarevis()
         {
-            visualSquare.isEnabled = true
+            visualSquare.isEnabled = false
             visualSquare.isInvisible = true
-            visualSquare.setPlayer(0)
-            visualSquare.setDensity(12F)
-            Globals.visual = 2
+            Globals.visual = 0
         }
         fun barvis()
         {
-            visual.isEnabled = true
+            visual.isEnabled = false
             visual.isInvisible = true
-            visual.setPlayer(0)
-            visual.setDensity(20F)
-            Globals.visual = 1
+            Globals.visual = 0
         }
         fun normallayout()
         {
