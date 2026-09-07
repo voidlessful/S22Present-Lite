@@ -193,6 +193,30 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
             pixelfontset()
         }
 
+        // Date in the top left corner, replacing the one in the main layout.
+        val dateText = Globals.datefield.text.toString()
+        Globals.datefield.isInvisible = true
+
+        // Fill the space the date left behind.
+        Globals.timefield.translationY = Globals.timefield.translationY + 12f
+        Globals.timefield.scaleX = Globals.timefield.scaleX * 1.25f
+        Globals.timefield.scaleY = Globals.timefield.scaleY * 1.25f
+
+        val dateView = TextView(context)
+        dateView.textSize = 9f
+        dateView.setPadding(5, 2, 0, 0)
+        dateView.typeface = Globals.timefield.typeface
+        dateView.setTextColor(Globals.timefield.currentTextColor)
+        dateView.text = dateText
+        addContentView(
+            dateView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.START
+            )
+        )
+
         // Battery percentage, pinned to the top right corner.
         val batteryView = TextView(context)
         batteryView.textSize = 9f
