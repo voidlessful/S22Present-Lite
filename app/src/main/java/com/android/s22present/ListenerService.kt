@@ -1,6 +1,7 @@
 package com.android.s22present
 
 import android.animation.ObjectAnimator
+import android.app.Notification
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -62,12 +63,19 @@ class NotificationService : NotificationListenerService() {
     private fun textOf(sbn: StatusBarNotification?): String =
         sbn?.notification?.extras?.getCharSequence("android.text")?.toString() ?: ""
 
-    private fun isMusic(pkg: String): Boolean =
-        pkg == "it.vfsfitvnm.vimusic" || pkg == "com.google.android.apps.youtube.music" ||
-        pkg == "com.spotify.music" || pkg == "org.fossify.musicplayer" ||
-        pkg == "com.pandora.android" || pkg == "com.clearchannel.iheartradio.controller" ||
-        pkg == "com.soundcloud.android" || pkg == "com.amazon.mp3" ||
-        pkg == "com.sec.android.app.music" || pkg == "com.apple.android.music"
+    // Detect players by their media session, not by a list of package names.
+    private fun isMusic(sbn: StatusBarNotification?): Boolean {
+        if (sbn == null) return false
+        val n = sbn.notification ?: return false
+        if (n.extras != null && n.extras.containsKey("android.mediaSession")) return true
+        if (n.category == Notification.CATEGORY_TRANSPORT) return true
+        val pkg = sbn.packageName
+        return pkg == "it.vfsfitvnm.vimusic" || pkg == "com.google.android.apps.youtube.music" ||
+            pkg == "com.spotify.music" || pkg == "org.fossify.musicplayer" ||
+            pkg == "com.pandora.android" || pkg == "com.clearchannel.iheartradio.controller" ||
+            pkg == "com.soundcloud.android" || pkg == "com.amazon.mp3" ||
+            pkg == "com.sec.android.app.music" || pkg == "com.apple.android.music"
+    }
 
     private fun clearDisplay() {
         Globals.titlefield.text = ""
@@ -85,9 +93,10 @@ class NotificationService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        val packageName = sbn.packageName
         val title = titleOf(sbn)
         val text = textOf(sbn)
+        val music = isMusic(sbn)
+        Log.v("S22PresNotifServ", "Posted from ${sbn.packageName}, music=$music")
         if (title.isNotEmpty() || text.isNotEmpty()) {
             if (Globals.titlefield.text == "" && Globals.style != "3") {
                 if (Globals.style != "4") {
@@ -100,18 +109,16 @@ class NotificationService : NotificationListenerService() {
                 ObjectAnimator.ofFloat(Globals.titlefield, "translationY", 0f).apply { duration = 500; start() }
                 ObjectAnimator.ofFloat(Globals.contentfield, "translationY", 0f).apply { duration = 500; start() }
             }
-            if (title != Globals.titlefield.text) {
-                Log.v("S22PresNotifServ", "Ping!")
-                if (isMusic(packageName)) {
-                    Log.v("S22PresNotifServ", "Music")
-                    musicactive = true
-                    musicnotiftitle = title
-                    musicnotiftext = text
-                    when (Globals.visual) {
-                        1 -> { Globals.visualbar.isInvisible = false }
-                        2 -> { Globals.visualsquare.isInvisible = false }
-                    }
+            if (music) {
+                musicactive = true
+                musicnotiftitle = title
+                musicnotiftext = text
+                when (Globals.visual) {
+                    1 -> { Globals.visualbar.isInvisible = false }
+                    2 -> { Globals.visualsquare.isInvisible = false }
                 }
+            }
+            if (title != Globals.titlefield.text) {
                 Globals.titlefield.text = title
                 Intent().also { broadcast ->
                     broadcast.setAction("com.android.s22present.NOTIFICATION_RECEIVED")
@@ -119,7 +126,7 @@ class NotificationService : NotificationListenerService() {
                 }
             }
             // Music keeps its second line. Everything else shows the sender only.
-            if (isMusic(packageName)) {
+            if (music) {
                 if (text != Globals.contentfield.text) {
                     Globals.contentfield.text = text
                 }
@@ -131,20 +138,7 @@ class NotificationService : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         Log.v("S22PresNotifServ", "Something got removed.")
-        val title = titleOf(sbn)
 
-        if (musicactive && title == musicnotiftitle) {
-            Log.v("S22PresNotifServ", "Clearing music")
-            when (Globals.visual) {
-                1 -> { Globals.visualbar.isInvisible = true }
-                2 -> { Globals.visualsquare.isInvisible = true }
-            }
-            musicactive = false
-            musicnotiftitle = ""
-            musicnotiftext = ""
-        }
-
-        // Don't try to match what was removed - ask what is still there.
         val active = try {
             activeNotifications?.toList()
         } catch (e: Exception) {
@@ -152,11 +146,12 @@ class NotificationService : NotificationListenerService() {
             null
         }
 
-        // Media notifications are usually ongoing, so check them separately.
-        val musicStill = active?.firstOrNull { isMusic(it.packageName) && titleOf(it).isNotEmpty() }
+        // Media notifications are usually ongoing, so look for them separately.
+        val musicStill = active?.firstOrNull { isMusic(it) && titleOf(it).isNotEmpty() }
 
         val remaining = active?.filter {
             it.isClearable &&
+            !isMusic(it) &&
             !it.notification.extras.getBoolean("android.isGroupSummary", false) &&
             titleOf(it).isNotEmpty()
         }
@@ -164,6 +159,7 @@ class NotificationService : NotificationListenerService() {
         when {
             active == null -> { }
             musicStill != null -> {
+                Log.v("S22PresNotifServ", "Restoring music")
                 musicactive = true
                 musicnotiftitle = titleOf(musicStill)
                 musicnotiftext = textOf(musicStill)
@@ -174,7 +170,16 @@ class NotificationService : NotificationListenerService() {
                     2 -> { Globals.visualsquare.isInvisible = false }
                 }
             }
-            remaining.isNullOrEmpty() -> clearDisplay()
+            remaining.isNullOrEmpty() -> {
+                musicactive = false
+                musicnotiftitle = ""
+                musicnotiftext = ""
+                when (Globals.visual) {
+                    1 -> { Globals.visualbar.isInvisible = true }
+                    2 -> { Globals.visualsquare.isInvisible = true }
+                }
+                clearDisplay()
+            }
             else -> {
                 if (Globals.titlefield.text.isNotEmpty()) {
                     val newest = remaining.maxByOrNull { it.postTime }
