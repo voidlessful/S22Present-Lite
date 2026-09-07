@@ -38,7 +38,7 @@ class ListenerService : Service()
         Globals.loading.progress = 3
         Globals.loadingtext.text = "Done!"
         Log.i("S22PresListServInit", "Listening...")
-        return START_NOT_STICKY
+        return START_STICKY
     }
     override fun onBind(intent: Intent?): IBinder? {
         return null
