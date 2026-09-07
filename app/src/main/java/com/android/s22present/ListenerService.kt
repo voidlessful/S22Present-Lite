@@ -120,6 +120,7 @@ class NotificationService : NotificationListenerService() {
                 Globals.contentfield.text = text
             }
         }
+    }}
             // Gmail and Chat use styled text; getString() returns null for it.
     private fun titleOf(sbn: StatusBarNotification?): String =
         sbn?.notification?.extras?.getCharSequence("android.title")?.toString() ?: ""
