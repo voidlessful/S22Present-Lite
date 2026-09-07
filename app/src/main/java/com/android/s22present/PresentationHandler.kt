@@ -202,7 +202,13 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
             {
                 val pct = level * 100 / scale
                 Log.i("S22PresBattery", "Battery is $pct%")
-                Globals.datefield.post { Globals.datefield.text = "$baseDate $pct%" }
+                    Globals.datefield.post {
+                    Globals.datefield.text = "$baseDate $pct"
+                    Globals.datefield.isSingleLine = true
+                    Globals.datefield.setHorizontallyScrolling(false)
+                    Globals.datefield.textScaleX = 0.85f
+                }
+
             }
             else
             {
