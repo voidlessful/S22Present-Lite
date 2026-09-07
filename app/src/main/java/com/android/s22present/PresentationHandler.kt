@@ -12,8 +12,10 @@ import android.os.BatteryManager
 import android.os.Bundle
 import android.util.Log
 import android.view.Display
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextClock
 import android.widget.TextView
@@ -191,8 +193,20 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
             pixelfontset()
         }
 
-        // Battery percentage, appended to the date line.
-        val baseDate = Globals.datefield.text.toString()
+        // Battery percentage, pinned to the top right corner.
+        val batteryView = TextView(context)
+        batteryView.textSize = 9f
+        batteryView.setPadding(0, 2, 5, 0)
+        batteryView.typeface = Globals.timefield.typeface
+        batteryView.setTextColor(Globals.timefield.currentTextColor)
+        addContentView(
+            batteryView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.END
+            )
+        )
 
         fun showBattery(batteryIntent: Intent?)
         {
@@ -202,13 +216,7 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
             {
                 val pct = level * 100 / scale
                 Log.i("S22PresBattery", "Battery is $pct%")
-                    Globals.datefield.post {
-                    Globals.datefield.text = "$baseDate $pct"
-                    Globals.datefield.isSingleLine = true
-                    Globals.datefield.setHorizontallyScrolling(false)
-                    Globals.datefield.textScaleX = 0.85f
-                }
-
+                batteryView.post { batteryView.text = "$pct%" }
             }
             else
             {
