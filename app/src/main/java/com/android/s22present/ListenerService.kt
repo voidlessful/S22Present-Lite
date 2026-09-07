@@ -120,60 +120,72 @@ class NotificationService : NotificationListenerService() {
                 Globals.contentfield.text = text
             }
         }
+            // Gmail and Chat use styled text; getString() returns null for it.
+    private fun titleOf(sbn: StatusBarNotification?): String =
+        sbn?.notification?.extras?.getCharSequence("android.title")?.toString() ?: ""
+
+    private fun textOf(sbn: StatusBarNotification?): String =
+        sbn?.notification?.extras?.getCharSequence("android.text")?.toString() ?: ""
+
+    // Slide the notification lines away and put the clock back.
+    private fun clearDisplay() {
+        Globals.titlefield.text = ""
+        Globals.contentfield.text = ""
+        if (Globals.style != "3") {
+            if (Globals.style != "4") {
+                ObjectAnimator.ofFloat(Globals.timefield, "translationY", 0f).apply { duration = 500; start() }
+            } else {
+                ObjectAnimator.ofFloat(Globals.timefield, "translationY", -12.5f).apply { duration = 500; start() }
+            }
+            ObjectAnimator.ofFloat(Globals.datefield, "translationY", 0f).apply { duration = 500; start() }
+            ObjectAnimator.ofFloat(Globals.titlefield, "translationY", 20f).apply { duration = 500; start() }
+            ObjectAnimator.ofFloat(Globals.contentfield, "translationY", 20f).apply { duration = 500; start() }
+        }
     }
+
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         Log.v("S22PresNotifServ", "Something got removed.")
-            val title = sbn?.notification?.extras?.getString("android.title")
-            val text = sbn?.notification?.extras?.getString("android.text")
-            if(Globals.titlefield.text == title && Globals.contentfield.text == text)
-            {
-                Log.v("S22PresNotifServ", "Clearing display.")
-                if(musicactive && title != musicnotiftitle)
-                {
-                    Log.v("S22PresNotifServ", "Switching to music")
-                    Globals.titlefield.text = musicnotiftitle
-                    Globals.contentfield.text = musicnotiftext
-                }
-                else
-                {
-                    Globals.titlefield.text = ""
-                    Globals.contentfield.text = ""
-                    if(Globals.style != "3")
-                    {
-                        if(Globals.style != "4")
-                        {
-                            ObjectAnimator.ofFloat(Globals.timefield, "translationY", 0f).apply { duration = 500; start() }
-                        }
-                        else
-                        {
-                            ObjectAnimator.ofFloat(Globals.timefield, "translationY", -12.5f).apply { duration = 500; start() }
-                        }
-                        ObjectAnimator.ofFloat(Globals.datefield, "translationY", 0f).apply { duration = 500; start() }
-                        ObjectAnimator.ofFloat(Globals.titlefield, "translationY", 20f).apply { duration = 500; start() }
-                        ObjectAnimator.ofFloat(Globals.contentfield, "translationY", 20f).apply { duration = 500; start() }
-                    }
-                }
-            }
-        if(musicactive && title==musicnotiftitle)
-        {
+        val title = titleOf(sbn)
+
+        // Music stopped - hide the visualiser.
+        if (musicactive && title == musicnotiftitle) {
             Log.v("S22PresNotifServ", "Clearing music")
-            when(Globals.visual)
-            {
-                1->{Globals.visualbar.isInvisible = true}
-                2->{Globals.visualsquare.isInvisible = true}
+            when (Globals.visual) {
+                1 -> { Globals.visualbar.isInvisible = true }
+                2 -> { Globals.visualsquare.isInvisible = true }
             }
-            musicactive=false
-            musicnotiftitle=""
-            musicnotiftext=""
+            musicactive = false
+            musicnotiftitle = ""
+            musicnotiftext = ""
+        }
+
+        // Don't try to match what was removed - ask what is still there.
+        val remaining = try {
+            activeNotifications?.filter {
+                it.isClearable &&
+                !it.notification.extras.getBoolean("android.isGroupSummary", false) &&
+                titleOf(it).isNotEmpty()
+            }
+        } catch (e: Exception) {
+            Log.w("S22PresNotifServ", "Couldn't read active notifications.")
+            null
+        }
+
+        when {
+            remaining == null -> { }
+            musicactive -> {
+                Globals.titlefield.text = musicnotiftitle
+                Globals.contentfield.text = musicnotiftext
+            }
+            remaining.isEmpty() -> clearDisplay()
+            else -> {
+                if (Globals.titlefield.text.isNotEmpty()) {
+                    val newest = remaining.maxByOrNull { it.postTime }
+                    Globals.titlefield.text = titleOf(newest)
+                    Globals.contentfield.text = textOf(newest)
+                }
+            }
         }
         super.onNotificationRemoved(sbn)
-        }
     }
-
-
-
-
-
-
-
-
+}
