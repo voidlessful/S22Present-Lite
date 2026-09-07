@@ -10,7 +10,6 @@ import android.os.IBinder
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
-import androidx.core.view.isInvisible
 import java.io.File
 
 class ListenerService : Service()
@@ -113,10 +112,6 @@ class NotificationService : NotificationListenerService() {
                 musicactive = true
                 musicnotiftitle = title
                 musicnotiftext = text
-                when (Globals.visual) {
-                    1 -> { Globals.visualbar.isInvisible = false }
-                    2 -> { Globals.visualsquare.isInvisible = false }
-                }
             }
             if (title != Globals.titlefield.text) {
                 Globals.titlefield.text = title
@@ -165,19 +160,11 @@ class NotificationService : NotificationListenerService() {
                 musicnotiftext = textOf(musicStill)
                 Globals.titlefield.text = musicnotiftitle
                 Globals.contentfield.text = musicnotiftext
-                when (Globals.visual) {
-                    1 -> { Globals.visualbar.isInvisible = false }
-                    2 -> { Globals.visualsquare.isInvisible = false }
-                }
             }
             remaining.isNullOrEmpty() -> {
                 musicactive = false
                 musicnotiftitle = ""
                 musicnotiftext = ""
-                when (Globals.visual) {
-                    1 -> { Globals.visualbar.isInvisible = true }
-                    2 -> { Globals.visualsquare.isInvisible = true }
-                }
                 clearDisplay()
             }
             else -> {
