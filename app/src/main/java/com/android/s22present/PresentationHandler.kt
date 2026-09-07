@@ -6,10 +6,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.BatteryManager
-
 import android.graphics.Color
 import android.graphics.Typeface
+import android.os.BatteryManager
 import android.os.Bundle
 import android.util.Log
 import android.view.Display
@@ -28,22 +27,20 @@ import java.time.format.FormatStyle
 // Manages the Presentation and it's contents.
 class PresentationHandler(context: Context, display: Display?): Presentation(context,display)
 {
+    private var batteryReceiver: BroadcastReceiver? = null
+
     override fun onCreate(savedInstanceState: Bundle?)
     {
-        // When started
         Log.i("S22PresHandlerInit", "Presentation start triggered")
         Display.FLAG_PRESENTATION
         Display.FLAG_SECURE
         WindowManager.LayoutParams.FLAG_SECURE
         WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
         super.onCreate(savedInstanceState)
-        // Grab the content variable and display whatever it says should be displayed.
         setContentView(R.layout.presentation)
-        // Get todays date and the "local" format (although im in the UK and this displays the month first!)
         var today = LocalDateTime.now()
         var format = DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
         var localtoday = today.format(format)
-        // Push the date to the presentation.
         Globals.datefield = findViewById(R.id.textView2)
         Globals.datefield.text = localtoday
         Globals.titlefield = findViewById(R.id.textViewTitle)
@@ -193,31 +190,55 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
         {
             pixelfontset()
         }
-                // Append the battery percentage to the date, and keep it current.
+
+        // Battery percentage, appended to the date line.
         val baseDate = Globals.datefield.text.toString()
-        batteryReceiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context?, intent: Intent?) {
-                val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-                val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-                if (level >= 0 && scale > 0) {
-                    Globals.datefield.text = "$baseDate  ${level * 100 / scale}%"
-                }
+
+        fun showBattery(batteryIntent: Intent?)
+        {
+            val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            if (level >= 0 && scale > 0)
+            {
+                val pct = level * 100 / scale
+                Log.i("S22PresBattery", "Battery is $pct%")
+                Globals.datefield.post { Globals.datefield.text = "$baseDate $pct%" }
+            }
+            else
+            {
+                Log.w("S22PresBattery", "No battery data in intent.")
             }
         }
-        context.registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+
+        batteryReceiver = object : BroadcastReceiver()
+        {
+            override fun onReceive(ctx: Context?, receivedIntent: Intent?)
+            {
+                showBattery(receivedIntent)
+            }
+        }
+        try
+        {
+            val sticky = context.applicationContext.registerReceiver(
+                batteryReceiver,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            )
+            showBattery(sticky)
+        }
+        catch (e: Exception)
+        {
+            Log.w("S22PresBattery", "Couldn't register battery receiver.")
+        }
 
         Log.i("S22PresHandlerInit", "Presentation displayed")
     }
 
-    private var batteryReceiver: BroadcastReceiver? = null
-
-    override fun onStop() {
+    override fun onStop()
+    {
         batteryReceiver?.let {
-            try { context.unregisterReceiver(it) } catch (e: IllegalArgumentException) { }
+            try { context.applicationContext.unregisterReceiver(it) } catch (e: Exception) { }
         }
         batteryReceiver = null
         super.onStop()
     }
 }
-
-
