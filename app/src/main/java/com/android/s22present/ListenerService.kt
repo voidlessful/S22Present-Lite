@@ -6,7 +6,9 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.hardware.display.DisplayManager
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -46,6 +48,14 @@ class ListenerService : Service()
 
 class NotificationService : NotificationListenerService() {
 
+    private val ticker = Handler(Looper.getMainLooper())
+    private var tickerTask: Runnable? = null
+    private var timerEnd = 0L
+
+    // Title sits centred in the space below the enlarged clock.
+    private val titleShown = 24f
+    private val titleHidden = 44f
+
     override fun onCreate() {
         Log.i("S22PresNotifServInit", "Listening...")
         super.onCreate()
@@ -69,17 +79,62 @@ class NotificationService : NotificationListenerService() {
             pkg == "com.sec.android.app.music" || pkg == "com.apple.android.music"
     }
 
+    // A running timer is a counting-down chronometer notification.
+    private fun isCountdown(sbn: StatusBarNotification?): Boolean {
+        val e = sbn?.notification?.extras ?: return false
+        return e.getBoolean("android.showChronometer", false) &&
+               e.getBoolean("android.chronometerCountDown", false)
+    }
+
     // Setting .text stops the marquee, so kick it off again each time.
     private fun setTitle(value: String) {
         Globals.titlefield.text = value
         Globals.titlefield.isSelected = true
     }
 
+    private fun stopTicker() {
+        tickerTask?.let { ticker.removeCallbacks(it) }
+        tickerTask = null
+    }
+
+    // Count down ourselves - the notification only carries an end timestamp.
+    private fun startTicker(endMillis: Long) {
+        stopTicker()
+        timerEnd = endMillis
+        val task = object : Runnable {
+            override fun run() {
+                val left = timerEnd - System.currentTimeMillis()
+                if (left <= 0) {
+                    setTitle("0:00")
+                    return
+                }
+                val secs = left / 1000
+                val h = secs / 3600
+                val m = (secs % 3600) / 60
+                val s = secs % 60
+                setTitle(
+                    if (h > 0) String.format("%d:%02d:%02d", h, m, s)
+                    else String.format("%d:%02d", m, s)
+                )
+                ticker.postDelayed(this, 1000)
+            }
+        }
+        tickerTask = task
+        ticker.post(task)
+    }
+
+    private fun slideIn() {
+        if (Globals.titlefield.text == "" && Globals.style != "3") {
+            ObjectAnimator.ofFloat(Globals.titlefield, "translationY", titleShown).apply { duration = 500; start() }
+        }
+    }
+
     private fun clearDisplay() {
+        stopTicker()
         setTitle("")
         Globals.contentfield.text = ""
         if (Globals.style != "3") {
-            ObjectAnimator.ofFloat(Globals.titlefield, "translationY", 20f).apply { duration = 500; start() }
+            ObjectAnimator.ofFloat(Globals.titlefield, "translationY", titleHidden).apply { duration = 500; start() }
         }
     }
 
@@ -87,13 +142,20 @@ class NotificationService : NotificationListenerService() {
         // Media notifications are ignored entirely.
         if (isMusic(sbn)) return
 
+        // A timer takes priority and drives its own countdown.
+        if (isCountdown(sbn)) {
+            slideIn()
+            startTicker(sbn.notification.`when`)
+            return
+        }
+
         val title = titleOf(sbn)
         if (title.isEmpty()) return
 
-        // Clock stays put - only the title slides in.
-        if (Globals.titlefield.text == "" && Globals.style != "3") {
-            ObjectAnimator.ofFloat(Globals.titlefield, "translationY", 0f).apply { duration = 500; start() }
-        }
+        // Don't let a notification interrupt a running timer.
+        if (tickerTask != null) return
+
+        slideIn()
         if (title != Globals.titlefield.text) {
             setTitle(title)
             Intent().also { broadcast ->
@@ -116,6 +178,14 @@ class NotificationService : NotificationListenerService() {
             Log.w("S22PresNotifServ", "Couldn't read active notifications.")
             null
         }
+
+        // Is a timer still running?
+        val timerStill = active?.firstOrNull { isCountdown(it) }
+        if (timerStill != null) {
+            startTicker(timerStill.notification.`when`)
+            return
+        }
+        stopTicker()
 
         val remaining = active?.filter {
             it.isClearable &&
