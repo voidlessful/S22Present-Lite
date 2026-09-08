@@ -79,14 +79,7 @@ class NotificationService : NotificationListenerService() {
         setTitle("")
         Globals.contentfield.text = ""
         if (Globals.style != "3") {
-            if (Globals.style != "4") {
-                ObjectAnimator.ofFloat(Globals.timefield, "translationY", 0f).apply { duration = 500; start() }
-            } else {
-                ObjectAnimator.ofFloat(Globals.timefield, "translationY", -12.5f).apply { duration = 500; start() }
-            }
-            ObjectAnimator.ofFloat(Globals.datefield, "translationY", 0f).apply { duration = 500; start() }
             ObjectAnimator.ofFloat(Globals.titlefield, "translationY", 20f).apply { duration = 500; start() }
-            ObjectAnimator.ofFloat(Globals.contentfield, "translationY", 20f).apply { duration = 500; start() }
         }
     }
 
@@ -97,16 +90,9 @@ class NotificationService : NotificationListenerService() {
         val title = titleOf(sbn)
         if (title.isEmpty()) return
 
+        // Clock stays put - only the title slides in.
         if (Globals.titlefield.text == "" && Globals.style != "3") {
-            if (Globals.style != "4") {
-                ObjectAnimator.ofFloat(Globals.datefield, "translationY", -20f).apply { duration = 500; start() }
-                ObjectAnimator.ofFloat(Globals.timefield, "translationY", -20f).apply { duration = 500; start() }
-            } else {
-                ObjectAnimator.ofFloat(Globals.datefield, "translationY", -18f).apply { duration = 500; start() }
-                ObjectAnimator.ofFloat(Globals.timefield, "translationY", -30f).apply { duration = 500; start() }
-            }
             ObjectAnimator.ofFloat(Globals.titlefield, "translationY", 0f).apply { duration = 500; start() }
-            ObjectAnimator.ofFloat(Globals.contentfield, "translationY", 0f).apply { duration = 500; start() }
         }
         if (title != Globals.titlefield.text) {
             setTitle(title)
