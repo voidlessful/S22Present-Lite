@@ -11,6 +11,8 @@ import android.graphics.Typeface
 import android.media.AudioManager
 import android.os.BatteryManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.TextUtils
 import android.util.Log
 import android.view.Display
@@ -241,7 +243,7 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
             )
         )
 
-        // Vertical volume bar, centred on the right edge.
+        // Vertical volume bar, centred on the right edge. Hidden until the keys are pressed.
         val trackWidth = 5
         val trackHeight = 56
         val volTrack = FrameLayout(context)
@@ -259,6 +261,10 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
         )
         volParams.rightMargin = 4
         addContentView(volTrack, volParams)
+        volTrack.visibility = View.INVISIBLE
+
+        val volHider = Handler(Looper.getMainLooper())
+        val hideVol = Runnable { volTrack.visibility = View.INVISIBLE }
 
         fun showVolume()
         {
@@ -285,6 +291,11 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
             override fun onReceive(ctx: Context?, receivedIntent: Intent?)
             {
                 showVolume()
+                volTrack.post {
+                    volTrack.visibility = View.VISIBLE
+                    volHider.removeCallbacks(hideVol)
+                    volHider.postDelayed(hideVol, 3000)
+                }
             }
         }
         try
@@ -298,7 +309,6 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
         {
             Log.w("S22PresVolume", "Couldn't register volume receiver.")
         }
-        showVolume()
 
         fun showBattery(batteryIntent: Intent?)
         {
