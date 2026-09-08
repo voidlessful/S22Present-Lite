@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.Typeface
+import android.media.AudioManager
 import android.os.BatteryManager
 import android.os.Bundle
 import android.text.TextUtils
@@ -31,6 +32,7 @@ import java.time.format.FormatStyle
 class PresentationHandler(context: Context, display: Display?): Presentation(context,display)
 {
     private var batteryReceiver: BroadcastReceiver? = null
+    private var volumeReceiver: BroadcastReceiver? = null
 
     override fun onCreate(savedInstanceState: Bundle?)
     {
@@ -206,11 +208,14 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
         Globals.timefield.scaleX = Globals.timefield.scaleX * 1.25f
         Globals.timefield.scaleY = Globals.timefield.scaleY * 1.25f
 
+        val accent = Globals.timefield.currentTextColor
+        val dim = Color.argb(70, Color.red(accent), Color.green(accent), Color.blue(accent))
+
         val dateView = TextView(context)
         dateView.textSize = 11f
         dateView.setPadding(5, 2, 0, 0)
         dateView.typeface = Globals.timefield.typeface
-        dateView.setTextColor(Globals.timefield.currentTextColor)
+        dateView.setTextColor(accent)
         dateView.text = dateText
         addContentView(
             dateView,
@@ -226,7 +231,7 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
         batteryView.textSize = 11f
         batteryView.setPadding(0, 2, 5, 0)
         batteryView.typeface = Globals.timefield.typeface
-        batteryView.setTextColor(Globals.timefield.currentTextColor)
+        batteryView.setTextColor(accent)
         addContentView(
             batteryView,
             FrameLayout.LayoutParams(
@@ -235,6 +240,65 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
                 Gravity.TOP or Gravity.END
             )
         )
+
+        // Vertical volume bar, centred on the right edge.
+        val trackWidth = 5
+        val trackHeight = 56
+        val volTrack = FrameLayout(context)
+        volTrack.setBackgroundColor(dim)
+        val volFill = View(context)
+        volFill.setBackgroundColor(accent)
+        volTrack.addView(
+            volFill,
+            FrameLayout.LayoutParams(trackWidth, 0, Gravity.BOTTOM)
+        )
+        val volParams = FrameLayout.LayoutParams(
+            trackWidth,
+            trackHeight,
+            Gravity.CENTER_VERTICAL or Gravity.END
+        )
+        volParams.rightMargin = 4
+        addContentView(volTrack, volParams)
+
+        fun showVolume()
+        {
+            try
+            {
+                val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val cur = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+                val filled = if (max > 0) (trackHeight * cur / max) else 0
+                volFill.post {
+                    val lp = volFill.layoutParams
+                    lp.height = filled
+                    volFill.layoutParams = lp
+                }
+            }
+            catch (e: Exception)
+            {
+                Log.w("S22PresVolume", "Couldn't read volume.")
+            }
+        }
+
+        volumeReceiver = object : BroadcastReceiver()
+        {
+            override fun onReceive(ctx: Context?, receivedIntent: Intent?)
+            {
+                showVolume()
+            }
+        }
+        try
+        {
+            context.applicationContext.registerReceiver(
+                volumeReceiver,
+                IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+            )
+        }
+        catch (e: Exception)
+        {
+            Log.w("S22PresVolume", "Couldn't register volume receiver.")
+        }
+        showVolume()
 
         fun showBattery(batteryIntent: Intent?)
         {
@@ -281,6 +345,10 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
             try { context.applicationContext.unregisterReceiver(it) } catch (e: Exception) { }
         }
         batteryReceiver = null
+        volumeReceiver?.let {
+            try { context.applicationContext.unregisterReceiver(it) } catch (e: Exception) { }
+        }
+        volumeReceiver = null
         super.onStop()
     }
 }
