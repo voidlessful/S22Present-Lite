@@ -10,6 +10,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.os.BatteryManager
 import android.os.Bundle
+import android.text.TextUtils
 import android.util.Log
 import android.view.Display
 import android.view.Gravity
@@ -190,6 +191,12 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
             pixelfontset()
         }
 
+        // Scroll long titles instead of clipping them.
+        Globals.titlefield.isSingleLine = true
+        Globals.titlefield.ellipsize = TextUtils.TruncateAt.MARQUEE
+        Globals.titlefield.marqueeRepeatLimit = -1
+        Globals.titlefield.isSelected = true
+
         // Date in the top left corner, replacing the one in the main layout.
         val dateText = Globals.datefield.text.toString()
         Globals.datefield.isInvisible = true
@@ -200,7 +207,7 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
         Globals.timefield.scaleY = Globals.timefield.scaleY * 1.25f
 
         val dateView = TextView(context)
-        dateView.textSize = 9f
+        dateView.textSize = 11f
         dateView.setPadding(5, 2, 0, 0)
         dateView.typeface = Globals.timefield.typeface
         dateView.setTextColor(Globals.timefield.currentTextColor)
@@ -216,7 +223,7 @@ class PresentationHandler(context: Context, display: Display?): Presentation(con
 
         // Battery percentage, pinned to the top right corner.
         val batteryView = TextView(context)
-        batteryView.textSize = 9f
+        batteryView.textSize = 11f
         batteryView.setPadding(0, 2, 5, 0)
         batteryView.typeface = Globals.timefield.typeface
         batteryView.setTextColor(Globals.timefield.currentTextColor)
